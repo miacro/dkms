@@ -638,11 +638,9 @@ static bool xpad_beitong_needs_ms_os_desc(struct usb_device *udev)
 	case 0x512f:
 	case 0x5130:
 	case 0x5133:
-	case 0x5134:
 	case 0x5145:
 	case 0x5146:
 	case 0x5149:
-	case 0x514a:
 	case 0x5150:
 	case 0x5151:
 	case 0x5152:
@@ -2264,7 +2262,7 @@ static int xpad_probe(struct usb_interface *intf, const struct usb_device_id *id
 					     GFP_KERNEL);
 		if (error)
 			dev_warn(&intf->dev,
-				 "unable to read Microsoft OS string descriptor: %d\\n",
+				 "unable to read Microsoft OS string descriptor: %d\n",
 				 error);
 	}
 

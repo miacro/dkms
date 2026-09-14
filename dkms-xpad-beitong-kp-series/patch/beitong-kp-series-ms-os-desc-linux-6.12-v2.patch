@@ -35,7 +35,7 @@
  	{ 0x20d6, 0x2001, "BDA Xbox Series X Wired Controller", 0, XTYPE_XBOXONE },
  	{ 0x20d6, 0x2009, "PowerA Enhanced Wired Controller for Xbox Series X|S", 0, XTYPE_XBOXONE },
  	{ 0x20d6, 0x2064, "PowerA Wired Controller for Xbox", MAP_SHARE_BUTTON, XTYPE_XBOXONE },
-@@ -587,6 +613,58 @@
+@@ -587,6 +613,56 @@
  
  MODULE_DEVICE_TABLE(usb, xpad_table);
  
@@ -64,11 +64,9 @@
 +	case 0x512f:
 +	case 0x5130:
 +	case 0x5133:
-+	case 0x5134:
 +	case 0x5145:
 +	case 0x5146:
 +	case 0x5149:
-+	case 0x514a:
 +	case 0x5150:
 +	case 0x5151:
 +	case 0x5152:
@@ -94,7 +92,7 @@
  struct xboxone_init_packet {
  	u16 idVendor;
  	u16 idProduct;
-@@ -2071,6 +2149,7 @@
+@@ -2071,6 +2147,7 @@
  	struct usb_device *udev = interface_to_usbdev(intf);
  	struct usb_xpad *xpad;
  	struct usb_endpoint_descriptor *ep_irq_in, *ep_irq_out;
@@ -102,11 +100,10 @@
  	int i, error;
  
  	if (intf->cur_altsetting->desc.bNumEndpoints != 2)
-@@ -2172,6 +2251,22 @@
- 	xpad->irq_in->transfer_flags |= URB_NO_TRANSFER_DMA_MAP;
+@@ -2173,6 +2250,22 @@
  
  	usb_set_intfdata(intf, xpad);
-+
+ 
 +	if (xpad_beitong_needs_ms_os_desc(udev)) {
 +		error = usb_control_msg_recv(udev, 0,
 +					     USB_REQ_GET_DESCRIPTOR,
@@ -119,9 +116,10 @@
 +					     GFP_KERNEL);
 +		if (error)
 +			dev_warn(&intf->dev,
-+				 "unable to read Microsoft OS string descriptor: %d\\n",
++				 "unable to read Microsoft OS string descriptor: %d\n",
 +				 error);
 +	}
- 
++
  	/* Packet type detection */
  	if (le16_to_cpu(udev->descriptor.idVendor) == 0x045e) { /* Microsoft controllers */
+ 		if (le16_to_cpu(udev->descriptor.idProduct) == 0x02e3) {
