@@ -1,33 +1,30 @@
-KDIR ?= /lib/modules/$(shell uname -r)/build
 KSRC ?= /usr/src/linux-source-6.12
 SRC  ?= $(KSRC)/drivers/input/joystick/xpad.c
 
 BUILD := $(CURDIR)/build
+XPAD  := $(CURDIR)/xpad.c
 PATCH := $(CURDIR)/patch/beitong-kp-series-ms-os-desc-linux-6.12-v2.patch
 
-.PHONY: all prepare patch module clean distclean
+.PHONY: all prepare patch clean distclean
 
-all: module
+all: prepare
+	$(MAKE) -C "$(BUILD)"
 
 prepare:
 	mkdir -p "$(BUILD)"
-	ln -sfn ../Makefile "$(BUILD)/Makefile"
-	cp "$(SRC)" "$(BUILD)/xpad.c"
-	mkdir -p "$(BUILD)/drivers/input/joystick"
-	cp "$(BUILD)/xpad.c" "$(BUILD)/drivers/input/joystick/xpad.c"
+	ln -sfn ../Makefile.ko "$(BUILD)/Makefile"
+	ln -sfn ../xpad.c "$(BUILD)/xpad.c"
 
-patch: prepare
+patch:
+	cp "$(SRC)" "$(XPAD)"
+	mkdir -p "$(BUILD)/drivers/input/joystick"
+	cp "$(XPAD)" "$(BUILD)/drivers/input/joystick/xpad.c"
 	cd "$(BUILD)" && patch -p1 < "$(PATCH)"
-	cp "$(BUILD)/drivers/input/joystick/xpad.c" "$(BUILD)/xpad.c"
+	cp "$(BUILD)/drivers/input/joystick/xpad.c" "$(XPAD)"
 	rm -rf "$(BUILD)/drivers"
 
-module: patch
-	$(MAKE) -C "$(KDIR)" M="$(BUILD)" modules
+clean: prepare
+	$(MAKE) -C "$(BUILD)" clean
 
-clean:
-	@if [ -d "$(BUILD)" ] && [ -e "$(BUILD)/Makefile" ]; then \
-		$(MAKE) -C "$(KDIR)" M="$(BUILD)" clean || true; \
-	fi
+distclean:
 	rm -rf "$(BUILD)"
-
-distclean: clean

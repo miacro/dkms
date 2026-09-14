@@ -62,7 +62,6 @@
  */
 
 #include <linux/bits.h>
-#include <linux/hid.h>
 #include <linux/kernel.h>
 #include <linux/input.h>
 #include <linux/rcupdate.h>
@@ -615,14 +614,15 @@ static const struct usb_device_id xpad_table[] = {
 MODULE_DEVICE_TABLE(usb, xpad_table);
 
 /*
- * Beitong KP-series controllers enumerate as standard Xbox 360 devices,
- * but these product IDs require a Microsoft OS Extended Compat ID
- * descriptor (XUSB10) read during probe to remain in XInput mode.
+ * Beitong KP-series controllers enumerate as Xbox 360 devices but need
+ * the Microsoft OS 1.0 string descriptor request at index 0xee during
+ * probe to remain in XInput mode.
  *
- * This is the Linux 6.12 backport equivalent of FLAG_READ_XUSB10 from
- * the upstream v3 proposal.
+ * This backport intentionally uses the standard GET_DESCRIPTOR request
+ * proposed during upstream review instead of directly issuing the
+ * Extended Compat ID vendor request with a fixed vendor code.
  */
-static bool xpad_beitong_needs_xusb10(struct usb_device *udev)
+static bool xpad_beitong_needs_ms_os_desc(struct usb_device *udev)
 {
 	u16 vendor = le16_to_cpu(udev->descriptor.idVendor);
 	u16 product = le16_to_cpu(udev->descriptor.idProduct);
@@ -638,9 +638,11 @@ static bool xpad_beitong_needs_xusb10(struct usb_device *udev)
 	case 0x512f:
 	case 0x5130:
 	case 0x5133:
+	case 0x5134:
 	case 0x5145:
 	case 0x5146:
 	case 0x5149:
+	case 0x514a:
 	case 0x5150:
 	case 0x5151:
 	case 0x5152:
@@ -2147,7 +2149,7 @@ static int xpad_probe(struct usb_interface *intf, const struct usb_device_id *id
 	struct usb_device *udev = interface_to_usbdev(intf);
 	struct usb_xpad *xpad;
 	struct usb_endpoint_descriptor *ep_irq_in, *ep_irq_out;
-	u8 ms_feature_descriptor[40];
+	u8 ms_os_string[18];
 	int i, error;
 
 	if (intf->cur_altsetting->desc.bNumEndpoints != 2)
@@ -2250,17 +2252,19 @@ static int xpad_probe(struct usb_interface *intf, const struct usb_device_id *id
 
 	usb_set_intfdata(intf, xpad);
 
-	if (xpad_beitong_needs_xusb10(udev)) {
-		error = usb_control_msg_recv(udev, 0, 0xee,
-					     USB_TYPE_VENDOR | USB_DIR_IN |
+	if (xpad_beitong_needs_ms_os_desc(udev)) {
+		error = usb_control_msg_recv(udev, 0,
+					     USB_REQ_GET_DESCRIPTOR,
+					     USB_DIR_IN | USB_TYPE_STANDARD |
 						USB_RECIP_DEVICE,
-					     0x0000, 0x0004,
-					     ms_feature_descriptor,
-					     sizeof(ms_feature_descriptor), 25,
+					     (USB_DT_STRING << 8) | 0xee,
+					     0x0000,
+					     ms_os_string,
+					     sizeof(ms_os_string), 25,
 					     GFP_KERNEL);
 		if (error)
 			dev_warn(&intf->dev,
-				 "unable to read Microsoft feature descriptor: %d\\n",
+				 "unable to read Microsoft OS string descriptor: %d\\n",
 				 error);
 	}
 
@@ -2427,80 +2431,7 @@ static struct usb_driver xpad_driver = {
 	.id_table	= xpad_table,
 };
 
-#if IS_REACHABLE(CONFIG_HID)
-static int xpad_receiver_probe(struct hid_device *hdev,
-			       const struct hid_device_id *id)
-{
-	int error;
-
-	error = hid_parse(hdev);
-	if (error)
-		return error;
-
-	error = hid_hw_start(hdev, 0);
-	if (error)
-		return error;
-
-	error = hid_hw_open(hdev);
-	if (error) {
-		hid_hw_stop(hdev);
-		return error;
-	}
-
-	return 0;
-}
-
-static void xpad_receiver_remove(struct hid_device *hdev)
-{
-	hid_hw_close(hdev);
-	hid_hw_stop(hdev);
-}
-
-static const struct hid_device_id xpad_receiver_devices[] = {
-	{ HID_USB_DEVICE(0x20dd, 0x515c) },
-	{ }
-};
-MODULE_DEVICE_TABLE(hid, xpad_receiver_devices);
-
-static struct hid_driver xpad_receiver_driver = {
-	.name = "xpad-kp40d-receiver",
-	.id_table = xpad_receiver_devices,
-	.probe = xpad_receiver_probe,
-	.remove = xpad_receiver_remove,
-};
-#endif
-
-static int __init xpad_init(void)
-{
-	int error;
-
-#if IS_REACHABLE(CONFIG_HID)
-	error = hid_register_driver(&xpad_receiver_driver);
-	if (error)
-		return error;
-#endif
-
-	error = usb_register(&xpad_driver);
-	if (error) {
-#if IS_REACHABLE(CONFIG_HID)
-		hid_unregister_driver(&xpad_receiver_driver);
-#endif
-		return error;
-	}
-
-	return 0;
-}
-
-static void __exit xpad_exit(void)
-{
-	usb_deregister(&xpad_driver);
-#if IS_REACHABLE(CONFIG_HID)
-	hid_unregister_driver(&xpad_receiver_driver);
-#endif
-}
-
-module_init(xpad_init);
-module_exit(xpad_exit);
+module_usb_driver(xpad_driver);
 
 MODULE_AUTHOR("Marko Friedemann <mfr@bmx-chemnitz.de>");
 MODULE_DESCRIPTION("Xbox pad driver");
