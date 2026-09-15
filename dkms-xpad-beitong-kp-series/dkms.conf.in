@@ -1,0 +1,13 @@
+PACKAGE_NAME="@PACKAGE_NAME@"
+PACKAGE_VERSION="@PACKAGE_VERSION@"
+
+BUILT_MODULE_NAME[0]="xpad"
+BUILT_MODULE_LOCATION[0]="."
+DEST_MODULE_LOCATION[0]="/updates/dkms"
+
+MAKE[0]="make KDIR=/lib/modules/${kernelver}/build"
+CLEAN="make KDIR=/lib/modules/${kernelver}/build clean"
+
+AUTOINSTALL="yes"
+
+BUILD_EXCLUSIVE_KERNEL="^6\.12\."
